@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>NSAID PK/PD Simulation</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      font-family: Arial;
+      margin: 30px;
+      background: #f7f7f7;
+    }
+    select, input, button {
+      padding: 8px;
+      margin: 8px 0;
+    }
+    canvas {
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+
+  <h2>NSAID PK/PD Simulation – Pain Reduction</h2>
+
+  <label for="drug">Select NSAID:</label>
+  <select id="drug" onchange="updateDose()">
+    <option value="Diclofenac">Diclofenac</option>
+    <option value="Ibuprofen">Ibuprofen</option>
+    <option value="Naproxen">Naproxen</option>
+  </select>
+
+  <br>
+  <label for="dose">Dose (mg):</label>
+  <input type="number" id="dose" value="50" />
+
+  <br>
+  <button onclick="simulatePKPD()">Simulate</button>
+
+  <canvas id="pkpdChart" width="800" height="400"></canvas>
+
+  <div id="info"></div>
+
+  <script>
+    const drugProfiles = {
+      Diclofenac: { ka: 1.5, ke: 0.3, Vd: 10, EC50: 0.8, Emax: 100, defaultDose: 50 },
+      Ibuprofen: { ka: 1.2, ke: 0.2, Vd: 15, EC50: 2.5, Emax: 90, defaultDose: 200 },
+      Naproxen: { ka: 0.9, ke: 0.1, Vd: 12, EC50: 1.5, Emax: 95, defaultDose: 250 }
+    };
+
+    let chart;
+
+    function updateDose() {
+      const drug = document.getElementById('drug').value;
+      document.getElementById('dose').value = drugProfiles[drug].defaultDose;
+    }
+
+    function simulatePKPD() {
+      const drug = document.getElementById('drug').value;
+      const dose = parseFloat(document.getElementById('dose').value);
+      const { ka, ke, Vd, EC50, Emax } = drugProfiles[drug];
+
+      const time = Array.from({ length: 25 }, (_, i) => i); // 0–24 h
+      const conc = [], effect = [];
+
+      for (let t = 0; t <= 24; t++) {
+        let c;
+        if (Math.abs(ka - ke) < 1e-6) {
+          c = (dose * ka * t * Math.exp(-ka * t)) / Vd;
+        } else {
+          c = ((dose * ka) / (Vd * (ka - ke))) * (Math.exp(-ke * t) - Math.exp(-ka * t));
+        }
+        conc.push(c);
+        effect.push((Emax * c) / (EC50 + c));
+      }
+
+      if (chart) chart.destroy();
+      const ctx = document.getElementById('pkpdChart').getContext('2d');
+      chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: time,
+          datasets: [
+            {
+              label: 'Drug Concentration (mg/L)',
+              data: conc,
+              borderColor: 'blue',
+              yAxisID: 'y1',
+              fill: false
+            },
+            {
+              label: 'Pain Reduction (%)',
+              data: effect,
+              borderColor: 'green',
+              yAxisID: 'y2',
+              fill: false
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          interaction: {
+            mode: 'index',
+            intersect: false
+          },
+          stacked: false,
+          plugins: {
+            title: {
+              display: true,
+              text: `${drug} PK/PD Simulation`
+            }
+          },
+          scales: {
+            y1: {
+              type: 'linear',
+              position: 'left',
+              title: { display: true, text: 'Concentration (mg/L)' }
+            },
+            y2: {
+              type: 'linear',
+              position: 'right',
+              title: { display: true, text: 'Pain Reduction (%)' },
+              min: 0,
+              max: 100
+            },
+            x: {
+              title: { display: true, text: 'Time (h)' }
+            }
+          }
+        }
+      });
+
+      const Cmax = Math.max(...conc).toFixed(2);
+      const Tmax = conc.indexOf(Math.max(...conc));
+      const MaxEffect = Math.max(...effect).toFixed(2);
+
+      document.getElementById('info').innerHTML = `
+        <h3>Simulation Summary:</h3>
+        <p><strong>C<sub>max</sub></strong>: ${Cmax} mg/L at <strong>T<sub>max</sub></strong>: ${Tmax} h</p>
+        <p><strong>Max Pain Reduction:</strong> ${MaxEffect}%</p>
+      `;
+    }
+
+    // Auto simulate for initial load
+    window.onload = () => simulatePKPD();
+  </script>
+
+</body>
+</html>
