@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Ostwald Viscometer Simulation</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+    }
+    label, select, button {
+      display: block;
+      margin: 10px 0;
+    }
+    #result {
+      margin-top: 15px;
+      font-weight: bold;
+    }
+    canvas {
+      max-width: 600px;
+      margin-top: 30px;
+      background-color: #f0f0f0;
+      border-radius: 10px;
+      padding: 10px;
+    }
+    .animation {
+      margin-top: 30px;
+      height: 200px;
+      border: 2px solid #ccc;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #e0f7fa;
+      font-size: 20px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+
+  <h2>Viscosity Determination using Ostwald Viscometer</h2>
+
+  <label for="liquid">Select Liquid:</label>
+  <select id="liquid">
+    <option value="glycerol">Glycerol</option>
+    <option value="ethanol">Ethanol</option>
+    <option value="acetone">Acetone</option>
+    <option value="benzene">Benzene</option>
+  </select>
+
+  <label for="concentration">Select Concentration (% w/v):</label>
+  <select id="concentration">
+    <option value="10">10%</option>
+    <option value="20">20%</option>
+    <option value="30">30%</option>
+    <option value="40">40%</option>
+    <option value="50">50%</option>
+    <option value="60">60%</option>
+    <option value="70">70%</option>
+    <option value="80">80%</option>
+    <option value="90">90%</option>
+    <option value="100">100%</option>
+  </select>
+
+  <button onclick="calculateViscosity()">Simulate</button>
+  <button onclick="exportPDF()">Export PDF Report</button>
+
+  <div id="result"></div>
+  <canvas id="viscosityChart"></canvas>
+  <div class="animation" id="flowAnim">🔄 Simulating Flow...</div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script>
+    const baseWaterTime = 50; // seconds
+    const baseWaterDensity = 1.0; // g/mL
+
+    const flowTimes = {
+      glycerol: [55, 60, 70, 80, 90, 100, 115, 130, 150, 170],
+      ethanol: [48, 50, 53, 55, 57, 60, 63, 66, 68, 70],
+      acetone: [45, 47, 48, 49, 50, 52, 54, 56, 58, 60],
+      benzene: [46, 48, 50, 52, 54, 56, 58, 60, 62, 64]
+    };
+
+    const densities = {
+      glycerol: 1.26,
+      ethanol: 0.79,
+      acetone: 0.79,
+      benzene: 0.88
+    };
+
+    let chart;
+
+    function calculateViscosity() {
+      const liquid = document.getElementById("liquid").value;
+      const conc = parseInt(document.getElementById("concentration").value);
+      const index = (conc / 10) - 1;
+      const testTime = flowTimes[liquid][index];
+      const relViscosity = (testTime / baseWaterTime).toFixed(2);
+
+      const absViscosity = ((testTime * densities[liquid]) / (baseWaterTime * baseWaterDensity)).toFixed(3);
+
+      document.getElementById("result").innerHTML =
+        `Flow time of water: ${baseWaterTime} s<br>
+         Flow time of ${conc}% ${liquid}: ${testTime} s<br>
+         Relative Viscosity (η<sub>rel</sub>): ${relViscosity}<br>
+         Absolute Viscosity (η): ${absViscosity} units`;
+
+      document.getElementById("flowAnim").textContent = `💧 Flowing: ${conc}% ${liquid}`;
+
+      plotViscosity(liquid);
+    }
+
+    function plotViscosity(liquid) {
+      const concentrations = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
+      const times = flowTimes[liquid];
+      const relViscosities = times.map(t => (t / baseWaterTime).toFixed(2));
+
+      const ctx = document.getElementById('viscosityChart').getContext('2d');
+      if (chart) chart.destroy();
+
+      chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: concentrations,
+          datasets: [{
+            label: `${liquid.charAt(0).toUpperCase() + liquid.slice(1)} - Relative Viscosity`,
+            data: relViscosities,
+            borderColor: 'teal',
+            fill: false,
+            tension: 0.3
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            title: {
+              display: true,
+              text: 'Concentration vs Relative Viscosity'
+            }
+          },
+          scales: {
+            x: {
+              title: { display: true, text: 'Concentration (%)' }
+            },
+            y: {
+              title: { display: true, text: 'Relative Viscosity (ηrel)' }
+            }
+          }
+        }
+      });
+    }
+
+    function exportPDF() {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+
+      const liquid = document.getElementById("liquid").value;
+      const conc = document.getElementById("concentration").value;
+      const res = document.getElementById("result").innerText;
+
+      doc.setFontSize(14);
+      doc.text("Ostwald Viscometer Report", 20, 20);
+      doc.setFontSize(11);
+      doc.text(`Liquid: ${liquid}`, 20, 40);
+      doc.text(`Concentration: ${conc}%`, 20, 50);
+      doc.text("Results:", 20, 65);
+      doc.text(res, 20, 75);
+
+      doc.save(`Viscosity_Report_${liquid}_${conc}%.pdf`);
+    }
+
+    window.onload = () => {
+      plotViscosity('glycerol');
+    };
+  </script>
+
+</body>
+</html>
